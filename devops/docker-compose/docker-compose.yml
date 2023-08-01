@@ -1,0 +1,51 @@
+# cd postgres-docker-compose
+# docker-compose -f ./devops/docker-compose/docker-compose.yml up
+# --> builds, runs at localhost
+
+# from: https://github.com/thomaxxl/als-docker
+
+# FIXME: would be better to load www (admin app) from <where>
+
+version: "3.5"
+
+services:
+    api-logic-server:
+        environment:
+          - APILOGICPROJECT_VERBOSE=true
+          # configure-me
+          - APILOGICPROJECT_CLIENT_URI=//10.0.0.77
+          - SECURITY_ENABLED=true
+          - PYTHONPATH=/app/ApiLogicProject 
+          - APILOGICPROJECT_SQLALCHEMY_DATABASE_URI=postgresql://postgres:p@nw_postgres/postgres
+          - APILOGICPROJECT_SQLALCHEMY_DATABASE_URI_AUTHENTICATION=postgresql://postgres:p@nw_postgres/authdb
+        build:
+            context: ../..
+            dockerfile: ./devops/docker-compose/Dockerfile.dockerfile
+        expose:
+            - 5000
+        volumes:
+            # relative path - thanks https://stackoverflow.com/questions/46907558/docker-compose-relative-paths-vs-docker-volume
+            - ./../..:/app
+        #command: /usr/local/bin/gunicorn --reload --workers 4 --worker-connections 4 --access-logfile=- --pythonpath /app/ApiLogicProject -b :5000 api_logic_server_run:flask_app 
+        command:  bash /app/start.sh #/app/ApiLogicProject/start.sh
+        working_dir: /app/ApiLogicProject 
+
+    nginx:
+        restart: always
+        image: nginx:latest
+        ports:
+            - "80:8080"
+            - "443:443"
+        volumes:
+            - ./www:/www:ro
+            - ./etc/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+            - ./etc/ssl:/etc/ssl:ro
+
+    nw_postgres:
+        image: apilogicserver/postgres:latest
+        restart: always
+        environment:
+          - PGDATA=/pgdata
+          - POSTGRES_PASSWORD=p
+        ports:
+          - "5432:5432"
